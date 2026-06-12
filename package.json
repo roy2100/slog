@@ -10,6 +10,8 @@
   ],
   "scripts": {
     "demo": "node examples/demo.ts",
+    "test": "node --test",
+    "coverage": "node --test --experimental-test-coverage",
     "typecheck": "tsc --noEmit"
   },
   "engines": {

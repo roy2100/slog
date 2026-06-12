@@ -429,18 +429,29 @@ class FileSink {
     }
   }
 
+  private exitHooks: Array<[NodeJS.Signals | "exit" | "beforeExit", (...a: never[]) => void]> = [];
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    // Remove our process listeners so many short-lived loggers don't leak them.
+    for (const [event, handler] of this.exitHooks) {
+      process.removeListener(event, handler as (...a: unknown[]) => void);
+    }
+    this.exitHooks = [];
     this.closeHandle();
   }
 
   private installExitHooks(): void {
     const onExit = () => this.close();
-    process.once("exit", onExit);
-    process.once("beforeExit", onExit);
+    const on = (event: NodeJS.Signals | "exit" | "beforeExit", handler: (...a: never[]) => void) => {
+      process.on(event, handler as (...a: unknown[]) => void);
+      this.exitHooks.push([event, handler]);
+    };
+    on("exit", onExit);
+    on("beforeExit", onExit);
     for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
-      process.once(sig, () => {
+      on(sig, () => {
         this.close();
         // Re-raise default behaviour after flushing.
         process.exit(process.exitCode ?? 0);
